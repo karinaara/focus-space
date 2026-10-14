@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="focus">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FocusSpace — Pomodoro & Ambient Sounds</title>
+<script>
+  // Apply saved theme before paint to avoid a flash
+  try {
+    const t = localStorage.getItem('fs_theme');
+    const dark = t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.classList.toggle('dark', dark);
+  } catch (e) {}
+</script>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script>tailwind.config = { darkMode: 'class' };</script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent: #f43f5e; --accent-soft: rgba(244,63,94,.14);
+    --text: #231f33; --muted: #6d6a82;
+    --glass: rgba(255,255,255,.55); --glass-border: rgba(255,255,255,.75);
+    --field: rgba(255,255,255,.6); --track: rgba(35,31,51,.09);
+    --shadow: 0 10px 40px -10px rgba(80,60,140,.25);
+    --bg: linear-gradient(135deg,#fde6ee 0%,#e6ebff 50%,#dcf6ee 100%);
+  }
+  html.dark {
+    --text: #ece9f8; --muted: #9b97b5;
+    --glass: rgba(24,22,44,.55); --glass-border: rgba(255,255,255,.09);
+    --field: rgba(255,255,255,.06); --track: rgba(255,255,255,.1);
+    --shadow: 0 10px 40px -10px rgba(0,0,0,.6);
+    --bg: linear-gradient(135deg,#0c0d1e 0%,#171034 55%,#0b1a24 100%);
+  }
+  html[data-mode="short"] { --accent:#14b8a6; --accent-soft:rgba(20,184,166,.15); }
+  html[data-mode="long"]  { --accent:#6366f1; --accent-soft:rgba(99,102,241,.15); }
+
+  body { font-family: 'Inter', system-ui, sans-serif; color: var(--text); background: var(--bg); background-attachment: fixed; min-height: 100vh; transition: background .4s; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .muted { color: var(--muted); }
+  .blob { position: fixed; border-radius: 9999px; filter: blur(90px); opacity: .45; pointer-events: none; z-index: 0; transition: background .8s; background: var(--accent); }
+  html.dark .blob { opacity: .22; }
+
+  .glass { background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(22px) saturate(160%); -webkit-backdrop-filter: blur(22px) saturate(160%); box-shadow: var(--shadow); border-radius: 1.75rem; }
+  .field { background: var(--field); border: 1px solid var(--glass-border); border-radius: .9rem; padding: .6rem .9rem; color: var(--text); outline: none; transition: box-shadow .2s, border-color .2s; width: 100%; }
+  .field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .field::placeholder { color: var(--muted); opacity: .7; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border-radius: .9rem; padding: .55rem .9rem; font-weight: 600; font-size: .85rem; background: var(--field); border: 1px solid var(--glass-border); color: var(--text); transition: transform .15s, background .2s, box-shadow .2s; cursor: pointer; }
+  .btn:hover { background: var(--accent-soft); transform: translateY(-1px); }
+  .btn:active { transform: scale(.96); }
+  .btn-accent { background: var(--accent); color: #fff; border-color: transparent; box-shadow: 0 8px 22px -6px var(--accent); }
+  .btn-accent:hover { background: var(--accent); filter: brightness(1.08); }
+  .icon-btn { width: 2.6rem; height: 2.6rem; padding: 0; border-radius: 9999px; }
+  .icon-btn svg { width: 1.1rem; height: 1.1rem; }
+  .play-btn { width: 4.4rem; height: 4.4rem; }
+  .play-btn svg { width: 1.7rem; height: 1.7rem; }
+
+  .tab { padding: .45rem 1rem; border-radius: 9999px; font-size: .82rem; font-weight: 600; color: var(--muted); transition: all .25s; cursor: pointer; white-space: nowrap; }
+  .tab.active { background: var(--accent); color: #fff; box-shadow: 0 6px 18px -6px var(--accent); }
+
+  .ring-fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .25s linear, stroke .6s; filter: drop-shadow(0 0 8px var(--accent)); }
+  .ring-bg { stroke: var(--track); }
+
+  input[type=range] { accent-color: var(--accent); width: 100%; height: 1.2rem; cursor: pointer; }
+  .switch { position: relative; width: 2.6rem; height: 1.5rem; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .switch span { position: absolute; inset: 0; border-radius: 9999px; background: var(--track); transition: background .25s; cursor: pointer; }
+  .switch span::after { content: ''; position: absolute; left: 3px; top: 3px; width: 1.15rem; height: 1.15rem; border-radius: 9999px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.25); transition: transform .25s; }
+  .switch input:checked + span { background: var(--accent); }
+  .switch input:checked + span::after { transform: translateX(1.1rem); }
+
+  .task { display: flex; align-items: center; gap: .6rem; padding: .6rem .7rem; border-radius: 1rem; border: 1px solid transparent; background: var(--field); transition: all .2s; }
+  .task.is-active { border-color: var(--accent); background: var(--accent-soft); }
+  .task.is-done .t-title { text-decoration: line-through; opacity: .5; }
+  .check { width: 1.4rem; height: 1.4rem; border-radius: 9999px; border: 2px solid var(--muted); display: grid; place-items: center; flex-shrink: 0; color: transparent; cursor: pointer; transition: all .2s; }
+  .check svg { width: .8rem; height: .8rem; }
+  .is-done .check { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .mini { width: 2rem; height: 2rem; border-radius: .6rem; display: grid; place-items: center; color: var(--muted); cursor: pointer; transition: all .2s; flex-shrink: 0; }
+  .mini:hover { background: var(--accent-soft); color: var(--accent); }
+  .mini svg { width: 1rem; height: 1rem; }
+  .mini.on { color: var(--accent); }
+
+  /* Zen / focus mode */
+  .zen-hide { transition: opacity .4s ease, transform .4s ease; }
+  body.zen-fade .zen-hide { opacity: 0; transform: translateY(8px) scale(.98); pointer-events: none; }
+  body.zen .zen-hide { display: none !important; }
+  body.zen #main { grid-template-columns: minmax(0, 36rem); justify-content: center; }
+  body.zen #timer-card { padding-top: 3rem; padding-bottom: 3rem; }
+  #main { transition: all .3s; }
+
+  dialog { border: none; background: transparent; padding: 0; color: var(--text); margin: auto; max-width: 92vw; }
+  dialog::backdrop { background: rgba(10,8,25,.5); backdrop-filter: blur(6px); }
+  #toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; transition: all .3s; z-index: 50; padding: .7rem 1.2rem; font-size: .85rem; font-weight: 500; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-thumb { background: var(--track); border-radius: 8px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="blob" style="width:420px;height:420px;top:-120px;left:-100px"></div>
+<div class="blob" style="width:360px;height:360px;bottom:-120px;right:-80px;opacity:.3"></div>
+
+<div class="relative z-10 min-h-screen px-4 py-5 sm:px-8">
+  <!-- Header -->
+  <header class="max-w-6xl mx-auto flex items-center justify-between gap-3 mb-6">
+    <div class="zen-hide flex items-center gap-2.5">
+      <div class="w-10 h-10 rounded-2xl grid place-items-center text-white" style="background:var(--accent);box-shadow:0 8px 22px -6px var(--accent)"><i data-lucide="timer" class="w-5 h-5"></i></div>
+      <div>
+        <h1 class="font-bold text-lg leading-tight">FocusSpace</h1>
+        <p class="muted text-xs hidden sm:block">Pomodoro &amp; ambient sounds</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 ml-auto">
+      <div class="zen-hide glass !rounded-2xl px-3 py-2 flex items-center gap-3 text-sm font-semibold" style="box-shadow:none">
+        <span title="Pomodoros completed today">🍅 <span id="stat-today">0</span></span>
+        <span class="w-px h-4" style="background:var(--track)"></span>
+        <span title="Consecutive days with at least one Pomodoro" class="flex items-center gap-1"><i data-lucide="flame" class="w-4 h-4" style="color:#f97316"></i><span id="stat-streak">0</span>d</span>
+      </div>
+      <button id="btn-settings" class="zen-hide btn icon-btn" title="Timer settings"><i data-lucide="settings"></i></button>
+      <button id="btn-zen" class="btn" title="Focus mode (F)"><i data-lucide="focus" class="w-4 h-4"></i><span class="hidden sm:inline" id="zen-label">Focus mode</span></button>
+      <button id="btn-theme" class="btn icon-btn" title="Toggle theme"><span id="theme-icon"></span></button>
+    </div>
+  </header>
+
+  <main id="main" class="max-w-6xl mx-auto grid gap-6 lg:grid-cols-2 items-start">
+    <!-- LEFT -->
+    <div class="flex flex-col gap-6 min-w-0">
+      <!-- Timer -->
+      <section id="timer-card" class="glass p-6 sm:p-8 flex flex-col items-center">
+        <div class="zen-hide flex gap-1 p-1 rounded-full mb-6" style="background:var(--field)" id="mode-tabs">
+          <button class="tab active" data-mode="focus">🎯 Focus</button>
+          <button class="tab" data-mode="short">☕ Short Break</button>
+          <button class="tab" data-mode="long">🌴 Long Break</button>
+        </div>
+
+        <div class="relative w-64 h-64 sm:w-72 sm:h-72">
+          <svg viewBox="0 0 280 280" class="w-full h-full -rotate-90">
+            <circle class="ring-bg" cx="140" cy="140" r="124" fill="none" stroke-width="12"/>
+            <circle id="ring" class="ring-fg" cx="140" cy="140" r="124" fill="none" stroke-width="12"/>
+          </svg>
+          <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <span id="mode-label" class="text-xs font-semibold tracking-widest uppercase muted mb-1">🎯 Focus</span>
+            <span id="time" class="mono text-5xl sm:text-6xl font-bold tracking-tight">25:00</span>
+            <span id="cycle-dots" class="flex gap-1.5 mt-3"></span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4 mt-6">
+          <button id="btn-reset" class="btn icon-btn" title="Reset"><i data-lucide="rotate-ccw"></i></button>
+          <button id="btn-play" class="btn btn-accent icon-btn play-btn" title="Start / Pause (Space)"><span id="play-icon"></span></button>
+          <button id="btn-skip" class="btn icon-btn" title="Skip to next session"><i data-lucide="skip-forward"></i></button>
+        </div>
+
+        <!-- Active task under timer -->
+        <div id="timer-task" class="mt-7 w-full max-w-sm text-center rounded-2xl px-4 py-3" style="background:var(--field);border:1px solid var(--glass-border)"></div>
+      </section>
+
+      <!-- Ambient sounds -->
+      <section class="zen-hide glass p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-bold flex items-center gap-2"><i data-lucide="audio-lines" class="w-5 h-5" style="color:var(--accent)"></i>Ambient Sounds</h2>
+          <span class="muted text-xs">Synthesized live · no files</span>
+        </div>
+        <div class="flex items-center gap-3 mb-5 p-3 rounded-2xl" style="background:var(--field)">
+          <i data-lucide="volume-2" class="w-5 h-5 muted shrink-0"></i>
+          <input id="master" type="range" min="0" max="100" value="70" aria-label="Master volume">
+          <span id="master-val" class="mono text-xs muted w-9 text-right">70%</span>
+        </div>
+        <div id="channels" class="flex flex-col gap-3"></div>
+      </section>
+
+      <!-- YouTube -->
+      <section class="zen-hide glass p-6">
+        <h2 class="font-bold flex items-center gap-2 mb-4"><i data-lucide="youtube" class="w-5 h-5" style="color:var(--accent)"></i>YouTube Music</h2>
+        <form id="yt-form" class="flex gap-2 mb-3">
+          <input id="yt-input" class="field" placeholder="Paste a YouTube video or playlist URL / ID" autocomplete="off">
+          <button class="btn btn-accent shrink-0" type="submit">Load</button>
+        </form>
+        <div class="flex flex-wrap gap-2 mb-4" id="yt-presets"></div>
+        <div id="yt-box" class="relative w-full aspect-video rounded-2xl overflow-hidden" style="background:#000">
+          <div id="yt-player" class="absolute inset-0 w-full h-full"></div>
+        </div>
+        <p id="yt-status" class="text-xs muted mt-3 leading-relaxed"></p>
+        <div class="flex gap-2 mt-3">
+          <button id="yt-toggle" class="btn"><i data-lucide="play" class="w-4 h-4"></i>Play / Pause</button>
+          <button id="yt-stop" class="btn"><i data-lucide="x" class="w-4 h-4"></i>Stop</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="flex flex-col gap-6 min-w-0 zen-hide">
+      <section class="glass p-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-bold flex items-center gap-2"><i data-lucide="target" class="w-5 h-5" style="color:var(--accent)"></i>Active Task</h2>
+        </div>
+        <div id="active-card"></div>
+      </section>
+
+      <section class="glass p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-bold flex items-center gap-2"><i data-lucide="list-checks" class="w-5 h-5" style="color:var(--accent)"></i>To-Do List</h2>
+          <div class="flex items-center gap-2">
+            <span id="task-count" class="muted text-xs"></span>
+            <button id="btn-clear-done" class="btn !py-1 !px-2.5 !text-xs">Clear done</button>
+          </div>
+        </div>
+        <form id="task-form" class="flex flex-col sm:flex-row gap-2 mb-4">
+          <input id="task-input" class="field" placeholder="What are you working on?" maxlength="120" autocomplete="off">
+          <div class="flex gap-2">
+            <div class="flex items-center gap-1 rounded-[.9rem] px-1.5 shrink-0" style="background:var(--field);border:1px solid var(--glass-border)" title="Estimated Pomodoros">
+              <button type="button" id="est-minus" class="mini"><i data-lucide="minus"></i></button>
+              <span class="font-semibold text-sm w-10 text-center select-none">🍅 <span id="est-val">1</span></span>
+              <button type="button" id="est-plus" class="mini"><i data-lucide="plus"></i></button>
+            </div>
+            <button class="btn btn-accent flex-1 sm:flex-none" type="submit"><i data-lucide="plus" class="w-4 h-4"></i>Add</button>
+          </div>
+        </form>
+        <ul id="task-list" class="flex flex-col gap-2 max-h-[28rem] overflow-y-auto pr-1"></ul>
+      </section>
+    </div>
+  </main>
+
+  <footer class="zen-hide max-w-6xl mx-auto mt-8 text-center muted text-xs">Space: start/pause · F: focus mode · everything is saved in your browser</footer>
+</div>
+
+<!-- Settings dialog -->
+<dialog id="settings-dialog">
+  <form method="dialog" id="settings-form" class="glass p-6 w-[26rem] max-w-full" style="background:var(--glass)">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="font-bold text-lg">Timer settings</h3>
+      <button type="button" class="mini" id="settings-close"><i data-lucide="x"></i></button>
+    </div>
+    <div class="grid grid-cols-3 gap-3 mb-4">
+      <label class="text-xs font-semibold muted">Focus (min)<input class="field mt-1 !text-base" type="number" min="1" max="180" id="set-focus"></label>
+      <label class="text-xs font-semibold muted">Short (min)<input class="field mt-1 !text-base" type="number" min="1" max="60" id="set-short"></label>
+      <label class="text-xs font-semibold muted">Long (min)<input class="field mt-1 !text-base" type="number" min="1" max="120" id="set-long"></label>
+    </div>
+    <label class="text-xs font-semibold muted block mb-4">Long break after N Pomodoros
+      <input class="field mt-1 !text-base" type="number" min="2" max="12" id="set-interval">
+    </label>
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-sm font-medium">Auto-start next session</span>
+      <label class="switch"><input type="checkbox" id="set-auto"><span></span></label>
+    </div>
+    <div class="flex items-center justify-between mb-6">
+      <span class="text-sm font-medium">Desktop notifications</span>
+      <label class="switch"><input type="checkbox" id="set-notify"><span></span></label>
+    </div>
+    <div class="flex gap-2 justify-end">
+      <button type="button" class="btn" id="settings-defaults">Defaults</button>
+      <button type="submit" class="btn btn-accent">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" class="glass !rounded-full"></div>
+
+<script>
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? { ...(typeof d === 'object' && !Array.isArray(d) ? d : {}), ...JSON.parse(v) } : d; } catch { return d; } };
+const loadRaw = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const setIcon = (el, name) => { el.innerHTML = `<i data-lucide="${name}"></i>`; lucide.createIcons(); };
+const pad = n => String(n).padStart(2, '0');
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+let toastTimer;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600); }
+
+/* ---------- theme ---------- */
+function applyTheme(dark) {
+  document.documentElement.classList.toggle('dark', dark);
+  setIcon($('#theme-icon'), dark ? 'sun' : 'moon');
+  try { localStorage.setItem('fs_theme', dark ? 'dark' : 'light'); } catch {}
+}
+$('#btn-theme').onclick = () => applyTheme(!document.documentElement.classList.contains('dark'));
+applyTheme(document.documentElement.classList.contains('dark'));
+
+/* ---------- zen mode ---------- */
+let zen = false, zenTimer;
+function setZen(on) {
+  zen = on; clearTimeout(zenTimer);
+  $('#zen-label').textContent = on ? 'Exit focus' : 'Focus mode';
+  if (on) { document.body.classList.add('zen-fade'); zenTimer = setTimeout(() => document.body.classList.add('zen'), 400); }
+  else { document.body.classList.remove('zen'); requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.remove('zen-fade'))); }
+}
+$('#btn-zen').onclick = () => setZen(!zen);
+
+/* ---------- audio core ---------- */
+let actx = null;
+function getCtx() {
+  if (!actx) {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    Ambient.init();
+  }
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+}
+
+function chime() {
+  const ctx = getCtx(), now = ctx.currentTime;
+  [[880, 0], [1318.5, .22], [1760, .44], [1318.5, .9]].forEach(([f, d], i) => {
+    [[1, 1], [2.76, .25], [5.4, .08]].forEach(([mult, amp]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = f * mult;
+      const t0 = now + d, peak = .22 * amp;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(peak, t0 + .01);
+      g.gain.exponentialRampToValueAtTime(.0001, t0 + (mult === 1 ? 2.2 : 1));
+      o.connect(g).connect(ctx.destination);
+      o.start(t0); o.stop(t0 + 2.4);
+    });
+  });
+}
+
+/* ---------- ambient synth ---------- */
+const Ambient = (() => {
+  let master, buffers = {};
+  const state = load('fs_sound', { master: 70, ch: {} });
+  const DEFS = [
+    { id: 'rain',  name: 'Rain',        icon: 'cloud-rain', gain: .7,  build: buildRain },
+    { id: 'ocean', name: 'Ocean Waves', icon: 'waves',      gain: 1.0, build: buildOcean },
+    { id: 'cafe',  name: 'Cafe',        icon: 'coffee',     gain: .9,  build: buildCafe },
+    { id: 'brown', name: 'Deep Brown Noise', icon: 'brain', gain: 1.3, build: buildBrown },
+  ];
+  DEFS.forEach(d => { d.on = false; d.vol = state.ch[d.id]?.vol ?? 60; d.bus = null; d.live = null; d.token = 0; });
+
+  function makeNoise(type) {
+    const len = actx.sampleRate * 8, buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+    let last = 0, b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, peak = 0;
+    for (let i = 0; i < len; i++) {
+      const w = Math.random() * 2 - 1;
+      if (type === 'white') d[i] = w;
+      else if (type === 'brown') { last = (last + .02 * w) / 1.02; d[i] = last * 3.5; }
+      else { // pink (Paul Kellet)
+        b0 = .99886 * b0 + w * .0555179; b1 = .99332 * b1 + w * .0750759; b2 = .969 * b2 + w * .153852;
+        b3 = .8665 * b3 + w * .3104856; b4 = .55 * b4 + w * .5329522; b5 = -.7616 * b5 - w * .016898;
+        d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * .5362) * .11; b6 = w * .115926;
+      }
+      peak = Math.max(peak, Math.abs(d[i]));
+    }
+    const k = .6 / peak; for (let i = 0; i < len; i++) d[i] *= k;   // normalize
+    return buf;
+  }
+  const noiseSrc = type => { const s = actx.createBufferSource(); s.buffer = buffers[type]; s.loop = true; s.loopStart = Math.random() * 4; return s; };
+  const biquad = (type, f, q = 1) => { const b = actx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; };
+  const lfo = (freq, depth, target) => { const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = freq; g.gain.value = depth; o.connect(g).connect(target); o.start(); return o; };
+
+  // Random one-shots (rain droplets, cafe clinks) — scheduled until stopped
+  function scheduler(fn, minMs, maxMs) {
+    let id, alive = true;
+    const loop = () => { if (!alive) return; fn(); id = setTimeout(loop, minMs + Math.random() * (maxMs - minMs)); };
+    loop();
+    return () => { alive = false; clearTimeout(id); };
+  }
+  function blip(out, { f1, f2, dur, amp, type = 'sine' }) {
+    const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+    o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(amp, t + .004); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g).connect(out); o.start(t); o.stop(t + dur + .05);
+  }
+
+  function buildRain(out) {
+    const src = noiseSrc('white'), hp = biquad('highpass', 500), lp = biquad('lowpass', 9000), g = actx.createGain();
+    g.gain.value = .35; src.connect(hp).connect(lp).connect(g).connect(out); src.start();
+    const body = noiseSrc('pink'), bp = biquad('bandpass', 1200, .5), bg = actx.createGain();
+    bg.gain.value = .5; body.connect(bp).connect(bg).connect(out); body.start();
+    const stopDrops = scheduler(() => {
+      const f = 1800 + Math.random() * 3500;
+      blip(out, { f1: f, f2: f * .55, dur: .03 + Math.random() * .04, amp: .05 + Math.random() * .1 });
+      if (Math.random() < .4) setTimeout(() => blip(out, { f1: f * 1.2, f2: f * .6, dur: .03, amp: .04 }), 20 + Math.random() * 60);
+    }, 25, 140);
+    return () => { stopDrops(); src.stop(); body.stop(); };
+  }
+  function buildOcean(out) {
+    const src = noiseSrc('pink'), lp = biquad('lowpass', 500, .7), wave = actx.createGain();
+    wave.gain.value = .55; src.connect(lp).connect(wave).connect(out); src.start();
+    const l1 = lfo(.11, .4, wave.gain), l2 = lfo(.11, 350, lp.frequency);   // swell: loudness + brightness together
+    const l3 = lfo(.067, .15, wave.gain);
+    const foam = noiseSrc('white'), hp = biquad('highpass', 3500), fg = actx.createGain();
+    fg.gain.value = .05; foam.connect(hp).connect(fg).connect(out); foam.start();
+    const l4 = lfo(.11, .05, fg.gain);
+    return () => { [src, foam, l1, l2, l3, l4].forEach(n => n.stop()); };
+  }
+  function buildCafe(out) {
+    const src = noiseSrc('pink'), bp = biquad('bandpass', 900, .6), g = actx.createGain();
+    g.gain.value = .75; src.connect(bp).connect(g).connect(out); src.start();
+    const mur = noiseSrc('brown'), bp2 = biquad('bandpass', 400, 1.2), mg = actx.createGain();
+    mg.gain.value = .6; mur.connect(bp2).connect(mg).connect(out); mur.start();
+    const l1 = lfo(.23, .25, mg.gain), l2 = lfo(.07, 120, bp.frequency);
+    const stopClinks = scheduler(() => {
+      const f = 2400 + Math.random() * 2200;
+      blip(out, { f1: f, f2: f * .98, dur: .35, amp: .035, type: 'triangle' });
+    }, 2500, 7000);
+    return () => { stopClinks(); [src, mur, l1, l2].forEach(n => n.stop()); };
+  }
+  function buildBrown(out) {
+    const src = noiseSrc('brown'), lp = biquad('lowpass', 220, .5), g = actx.createGain();
+    g.gain.value = 1.4; src.connect(lp).connect(g).connect(out); src.start();
+    return () => src.stop();
+  }
+
+  function applyBus(ch) {
+    if (!ch.bus) return;
+    ch.bus.gain.setTargetAtTime(ch.on ? (ch.vol / 100) * ch.gain : 0, actx.currentTime, .15);
+  }
+  function setOn(ch, on) {
+    ch.on = on; getCtx();
+    if (on) {
+      if (!ch.live) {
+        ch.bus = ch.bus || (() => { const b = actx.createGain(); b.gain.value = 0; b.connect(master); return b; })();
+        ch.live = ch.build(ch.bus);
+      }
+      ch.token++;
+    } else {
+      const tk = ++ch.token;
+      setTimeout(() => { if (tk === ch.token && ch.live) { ch.live(); ch.live = null; } }, 900);
+    }
+    applyBus(ch);
+    persist();
+  }
+  const persist = () => save('fs_sound', { master: state.master, ch: Object.fromEntries(DEFS.map(d => [d.id, { vol: d.vol }])) });
+
+  function init() {
+    master = actx.createGain(); master.gain.value = state.master / 100; master.connect(actx.destination);
+    ['white', 'pink', 'brown'].forEach(t => buffers[t] = makeNoise(t));
+  }
+
+  function setMaster(v) {
+    state.master = v;
+    if (master) master.gain.setTargetAtTime(v / 100, actx.currentTime, .05);
+    YTP.setVolume(v); persist();
+  }
+
+  function renderUI() {
+    $('#master').value = state.master; $('#master-val').textContent = state.master + '%';
+    $('#master').oninput = e => { setMaster(+e.target.value); $('#master-val').textContent = e.target.value + '%'; };
+    $('#channels').innerHTML = DEFS.map(d => `
+      <div class="flex items-center gap-3 p-3 rounded-2xl" style="background:var(--field)">
+        <div class="w-9 h-9 rounded-xl grid place-items-center shrink-0" style="background:var(--accent-soft);color:var(--accent)"><i data-lucide="${d.icon}" class="w-[1.1rem] h-[1.1rem]"></i></div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold mb-0.5">${d.name}</div>
+          <input type="range" min="0" max="100" value="${d.vol}" data-vol="${d.id}" aria-label="${d.name} volume">
+        </div>
+        <label class="switch"><input type="checkbox" data-tog="${d.id}" aria-label="Toggle ${d.name}"><span></span></label>
+      </div>`).join('');
+    $$('[data-tog]').forEach(el => el.onchange = () => setOn(DEFS.find(d => d.id === el.dataset.tog), el.checked));
+    $$('[data-vol]').forEach(el => el.oninput = () => { const d = DEFS.find(x => x.id === el.dataset.vol); d.vol = +el.value; applyBus(d); persist(); });
+  }
+  return { init, renderUI, state };
+})();
+
+/* ---------- YouTube ---------- */
+const YTP = (() => {
+  let player = null, ready = false, pending = null;
+  const PRESETS = [
+    { label: 'Lofi Radio', icon: '🎧', id: 'lTRiuFIWV54' },
+    { label: 'Chillhop', icon: '🌿', id: '5yx6BWlEVcY' },
+    { label: 'Chill Jazz', icon: '🎷', id: 'Dx5qFachd3A' },
+  ];
+  const ID = /^[\w-]{11}$/;
+  function parse(s) {
+    s = s.trim(); if (!s) return null;
+    if (ID.test(s)) return { id: s };
+    if (/^[\w-]{12,}$/.test(s)) return { list: s };            // bare playlist ID (PL…, UU…, OLAK…, RD…)
+    try {
+      const u = new URL(/^(https?:)?\/\//i.test(s) ? s : 'https://' + s);
+      const list = u.searchParams.get('list'), v = u.searchParams.get('v');
+      let id = v && ID.test(v) ? v : null;
+      if (!id && u.hostname.includes('youtu.be')) { const x = u.pathname.slice(1, 12); if (ID.test(x)) id = x; }
+      if (!id) { const m = u.pathname.match(/\/(?:embed|shorts|live|v)\/([\w-]{11})/); if (m) id = m[1]; }
+      if (id || list) return { id, list };                       // video, playlist, or video inside a playlist
+    } catch {}
+    return null;
+  }
+  let apiReady = false, current = null;
+  function status(html) { $('#yt-status').innerHTML = html; }
+  function mount(p) {
+    if (player) { try { player.destroy(); } catch {} player = null; ready = false; }
+    const box = $('#yt-box'); box.innerHTML = '<div id="yt-player" class="absolute inset-0 w-full h-full"></div>';
+    const vars = { autoplay: 1, playsinline: 1, rel: 0 };
+    if (p.list) { vars.listType = 'playlist'; vars.list = p.list; }
+    current = p;
+    const opts = {
+      width: '100%', height: '100%', playerVars: vars,
+      events: {
+        onReady: e => { ready = true; e.target.setVolume(Ambient.state.master); e.target.playVideo(); },
+        onError: e => {
+          const c = e.data, link = `<a class="underline" target="_blank" rel="noopener" href="https://www.youtube.com/${p.list && !p.id ? 'playlist?list=' + p.list : 'watch?v=' + p.id}">Open on YouTube</a>`;
+          if ((c === 101 || c === 150 || c === 100) && p.list) { status('This video can’t be embedded — skipping to the next one…'); try { player.nextVideo(); } catch {} return; }
+          if (c === 153 || (location.protocol === 'file:' && c !== 100)) status('YouTube blocked playback because the page is opened as a local file. Serve it over http (e.g. <code>python -m http.server</code>) or host it online. ' + link);
+          else if (c === 101 || c === 150) status('The owner disabled embedding for this video. ' + link);
+          else if (c === 100) status('Video not found, private, or removed. ' + link);
+          else status('Couldn’t play that link. ' + link);
+        },
+      },
+    };
+    if (p.id) opts.videoId = p.id;      // omit entirely for playlist-only links (the API throws on undefined)
+    try { player = new window.YT.Player('yt-player', opts); } catch (err) { status('Couldn’t start the player: ' + esc(String(err.message || err))); }
+  }
+  window.onYouTubeIframeAPIReady = () => { apiReady = true; if (pending) { mount(pending); pending = null; } };
+  function load(p) {
+    if (!p) return toast('Couldn’t read that YouTube link or ID');
+    status('');
+    if (!apiReady) { pending = p; toast('Player is loading…'); return; }
+    mount(p);
+  }
+  function init() {
+    $('#yt-presets').innerHTML = PRESETS.map((p, i) => `<button class="btn" data-preset="${i}">${p.icon} ${p.label}</button>`).join('');
+    $$('[data-preset]').forEach(b => b.onclick = () => { const p = PRESETS[b.dataset.preset]; $('#yt-input').value = ''; load({ id: p.id }); });
+    $('#yt-form').onsubmit = e => { e.preventDefault(); load(parse($('#yt-input').value)); };
+    $('#yt-toggle').onclick = () => {
+      if (!ready) return toast('Load a video or playlist first');
+      player.getPlayerState() === 1 ? player.pauseVideo() : player.playVideo();
+    };
+    $('#yt-stop').onclick = () => { if (ready) player.stopVideo(); };
+    const tag = document.createElement('script'); tag.src = 'https://www.youtube.com/iframe_api';
+    tag.onerror = () => toast('YouTube player could not load (offline?)');
+    document.head.appendChild(tag);
+  }
+  function setVolume(v) { if (ready) player.setVolume(v); }
+  return { init, setVolume };
+})();
+/* ---------- timer ---------- */
+const MODES = { focus: { label: 'Focus', emoji: '🎯' }, short: { label: 'Short Break', emoji: '☕' }, long: { label: 'Long Break', emoji: '🌴' } };
+const DEFAULTS = { focus: 25, short: 5, long: 15, interval: 4, auto: false, notify: false };
+let settings = load('fs_settings', DEFAULTS);
+const C = 2 * Math.PI * 124;
+const ring = $('#ring'); ring.style.strokeDasharray = C;
+const T = { mode: 'focus', total: 0, remaining: 0, running: false, end: 0, cycle: 0 };
+let tickId = null;
+
+function setMode(m) {
+  clearInterval(tickId); T.running = false;
+  T.mode = m; T.total = settings[m] * 60; T.remaining = T.total;
+  document.documentElement.dataset.mode = m;
+  $$('#mode-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.mode === m));
+  render();
+}
+function msLeft() { return T.running ? Math.max(0, T.end - Date.now()) : T.remaining * 1000; }
+function render() {
+  const ms = msLeft(), secs = Math.ceil(ms / 1000), txt = `${pad(Math.floor(secs / 60))}:${pad(secs % 60)}`;
+  $('#time').textContent = txt;
+  $('#mode-label').textContent = `${MODES[T.mode].emoji} ${MODES[T.mode].label}`;
+  ring.style.strokeDashoffset = C * (1 - ms / (T.total * 1000));
+  document.title = `(${txt}) ${MODES[T.mode].emoji} ${MODES[T.mode].label} - FocusSpace`;
+  const pi = $('#play-icon'); const want = T.running ? 'pause' : 'play';
+  if (pi.dataset.i !== want) { pi.dataset.i = want; setIcon(pi, want); }
+  const done = T.cycle % settings.interval;
+  $('#cycle-dots').innerHTML = Array.from({ length: settings.interval }, (_, i) => `<span class="w-2 h-2 rounded-full" style="background:${i < done ? 'var(--accent)' : 'var(--track)'}"></span>`).join('');
+}
+function start() {
+  if (T.running) return;
+  getCtx();   // unlock audio on user gesture
+  if (settings.notify && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+  T.running = true; T.end = Date.now() + T.remaining * 1000;
+  tickId = setInterval(tick, 250); render();
+}
+function pause() {
+  if (!T.running) return;
+  T.remaining = Math.ceil(msLeft() / 1000); T.running = false; clearInterval(tickId); render();
+}
+function tick() { if (msLeft() <= 0) complete(); else render(); }
+function reset() { setMode(T.mode); }
+function nextMode(completed) {
+  if (T.mode === 'focus') {
+    if (completed) T.cycle++;
+    return completed && T.cycle % settings.interval === 0 ? 'long' : 'short';
+  }
+  return 'focus';
+}
+function complete() {
+  const wasFocus = T.mode === 'focus';
+  chime();
+  if (wasFocus) { logPomodoro(); const t = tasks.find(x => x.id === activeId); if (t) { t.spent++; saveTasks(); renderTasks(); } }
+  const next = nextMode(true);
+  toast(wasFocus ? 'Focus session complete! Time for a break 🎉' : 'Break over — ready to focus? 🎯');
+  if (settings.notify && 'Notification' in window && Notification.permission === 'granted') {
+    try { new Notification(wasFocus ? 'Focus complete 🍅' : 'Break over', { body: `Up next: ${MODES[next].label}` }); } catch {}
+  }
+  setMode(next);
+  if (settings.auto) start();
+}
+function skip() { const was = T.mode; const next = nextMode(false); setMode(next); if (settings.auto && was) { /* manual skip never auto-starts */ } }
+
+$('#btn-play').onclick = () => T.running ? pause() : start();
+$('#btn-reset').onclick = reset;
+$('#btn-skip').onclick = skip;
+$$('#mode-tabs .tab').forEach(t => t.onclick = () => setMode(t.dataset.mode));
+document.addEventListener('visibilitychange', () => { if (T.running) tick(); });
+
+/* ---------- daily stats ---------- */
+let log = loadRaw('fs_log', {});
+function logPomodoro() { const k = dayKey(); log[k] = (log[k] || 0) + 1; save('fs_log', log); renderStats(); }
+function renderStats() {
+  $('#stat-today').textContent = log[dayKey()] || 0;
+  let streak = 0; const d = new Date();
+  if (!log[dayKey(d)]) d.setDate(d.getDate() - 1);   // today not started yet doesn't break the streak
+  while (log[dayKey(d)] > 0) { streak++; d.setDate(d.getDate() - 1); }
+  $('#stat-streak').textContent = streak;
+}
+
+/* ---------- tasks ---------- */
+let tasks = loadRaw('fs_tasks', []);
+let activeId = loadRaw('fs_active', null);
+let est = 1;
+const saveTasks = () => { save('fs_tasks', tasks); save('fs_active', activeId); };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+function renderTasks() {
+  const act = tasks.find(t => t.id === activeId && !t.done);
+  if (!act) activeId = null;
+  // Under the timer
+  $('#timer-task').innerHTML = act
+    ? `<div class="text-[.68rem] font-semibold tracking-widest uppercase muted mb-0.5">Currently working on</div>
+       <div class="font-semibold text-lg leading-snug break-words">${esc(act.title)}</div>
+       <div class="text-xs muted mt-0.5">🍅 ${act.spent} / ${act.est}</div>`
+    : `<div class="text-sm muted">No active task — pick one from your to-do list</div>`;
+  // Right-hand active card
+  $('#active-card').innerHTML = act
+    ? `<div class="rounded-2xl p-4" style="background:var(--accent-soft);border:1px solid var(--accent)">
+         <div class="font-semibold text-lg break-words">${esc(act.title)}</div>
+         <div class="flex items-center gap-1 mt-2 flex-wrap">${Array.from({ length: Math.max(act.est, act.spent) }, (_, i) => `<span class="text-lg ${i < act.spent ? '' : 'opacity-25 grayscale'}">🍅</span>`).join('')}</div>
+         <div class="flex gap-2 mt-3">
+           <button class="btn" data-quick="done"><i data-lucide="check" class="w-4 h-4"></i>Mark done</button>
+           <button class="btn" data-quick="clear">Unselect</button>
+         </div>
+       </div>`
+    : `<p class="muted text-sm">Select a task with the <i data-lucide="target" class="inline w-4 h-4 -mt-0.5"></i> button to bind it to your timer.</p>`;
+  // List
+  const sorted = [...tasks].sort((a, b) => a.done - b.done);
+  $('#task-list').innerHTML = sorted.length ? sorted.map(t => `
+    <li class="task ${t.id === activeId ? 'is-active' : ''} ${t.done ? 'is-done' : ''}" data-id="${t.id}">
+      <div class="check" data-act="done" role="checkbox" aria-checked="${t.done}" tabindex="0"><i data-lucide="check"></i></div>
+      <div class="flex-1 min-w-0">
+        <div class="t-title text-sm font-medium break-words">${esc(t.title)}</div>
+        <div class="text-xs muted">🍅 ${t.spent} / ${t.est}</div>
+      </div>
+      ${t.done ? '' : `<div class="mini ${t.id === activeId ? 'on' : ''}" data-act="active" title="Work on this"><i data-lucide="target"></i></div>`}
+      <div class="mini" data-act="del" title="Delete"><i data-lucide="trash-2"></i></div>
+    </li>`).join('') : `<li class="text-center muted text-sm py-6">Nothing here yet. Add your first task ✨</li>`;
+  const left = tasks.filter(t => !t.done).length;
+  $('#task-count').textContent = tasks.length ? `${left} left` : '';
+  lucide.createIcons();
+}
+$('#task-list').onclick = e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const id = el.closest('.task').dataset.id, t = tasks.find(x => x.id === id), act = el.dataset.act;
+  if (act === 'done') { t.done = !t.done; if (t.done && activeId === id) activeId = null; }
+  else if (act === 'active') activeId = activeId === id ? null : id;
+  else if (act === 'del') { tasks = tasks.filter(x => x.id !== id); if (activeId === id) activeId = null; }
+  saveTasks(); renderTasks();
+};
+$('#task-list').onkeydown = e => { if ((e.key === ' ' || e.key === 'Enter') && e.target.dataset.act === 'done') { e.preventDefault(); e.target.click(); } };
+$('#active-card').onclick = e => {
+  const q = e.target.closest('[data-quick]'); if (!q) return;
+  if (q.dataset.quick === 'done') { const t = tasks.find(x => x.id === activeId); if (t) t.done = true; }
+  activeId = null; saveTasks(); renderTasks();
+};
+$('#task-form').onsubmit = e => {
+  e.preventDefault();
+  const title = $('#task-input').value.trim(); if (!title) return;
+  const t = { id: uid(), title, est, spent: 0, done: false };
+  tasks.push(t); if (!activeId) activeId = t.id;
+  $('#task-input').value = ''; saveTasks(); renderTasks();
+};
+$('#est-minus').onclick = () => { est = Math.max(1, est - 1); $('#est-val').textContent = est; };
+$('#est-plus').onclick = () => { est = Math.min(12, est + 1); $('#est-val').textContent = est; };
+$('#btn-clear-done').onclick = () => { tasks = tasks.filter(t => !t.done); saveTasks(); renderTasks(); };
+
+/* ---------- settings dialog ---------- */
+const dlg = $('#settings-dialog');
+function fillSettings(s) {
+  $('#set-focus').value = s.focus; $('#set-short').value = s.short; $('#set-long').value = s.long;
+  $('#set-interval').value = s.interval; $('#set-auto').checked = s.auto; $('#set-notify').checked = s.notify;
+}
+$('#btn-settings').onclick = () => { fillSettings(settings); dlg.showModal(); };
+$('#settings-close').onclick = () => dlg.close();
+$('#settings-defaults').onclick = () => fillSettings(DEFAULTS);
+dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+$('#settings-form').onsubmit = () => {
+  const n = (id, lo, hi, d) => Math.min(hi, Math.max(lo, parseInt($(id).value) || d));
+  settings = {
+    focus: n('#set-focus', 1, 180, 25), short: n('#set-short', 1, 60, 5), long: n('#set-long', 1, 120, 15),
+    interval: n('#set-interval', 2, 12, 4), auto: $('#set-auto').checked, notify: $('#set-notify').checked,
+  };
+  save('fs_settings', settings);
+  if (settings.notify && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+  if (!T.running) setMode(T.mode); else render();
+  toast('Settings saved');
+};
+
+/* ---------- keyboard ---------- */
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input, textarea, select') || e.target.isContentEditable || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.code === 'Space' && !e.target.closest('button, [role=checkbox]')) { e.preventDefault(); T.running ? pause() : start(); }
+  else if (e.key.toLowerCase() === 'f') setZen(!zen);
+  else if (e.key === 'Escape' && zen) setZen(false);
+});
+
+/* ---------- boot ---------- */
+Ambient.renderUI();
+YTP.init();
+renderStats();
+renderTasks();
+setMode('focus');
+lucide.createIcons();
+</script>
+</body>
+</html>
