@@ -1,42 +1,98 @@
 # 🍅 FocusSpace — Pomodoro & Ambient Sounds
 
-**FocusSpace** adalah aplikasi produktivitas berbasis web yang menggabungkan *timer* Pomodoro, suara latar ambient (*synthesized live* menggunakan Web Audio API), pemutar musik YouTube, dan manajemen tugas (*to-do list*). Dilengkapi dengan mode fokus (Zen mode) dan pelacak *streak* harian.
+[![Live Demo](https://img.shields.io/badge/Demo-Live%20App-brightgreen?style=for-the-badge&logo=netlify)](https://focus-space-podomoro.netlify.app/)
+[![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/HTML)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+
+> A modern, web-based productivity workspace combining a customizable Pomodoro timer, real-time synthesized ambient sounds (powered by the Web Audio API), embedded YouTube music player, and task management with daily streak tracking.
+
+🌐 **Live Demo:** [https://focus-space-podomoro.netlify.app/](https://focus-space-podomoro.netlify.app/)
 
 ---
 
-### 🌟 Fitur Utama
+## 📌 Table of Contents
 
-* **🎯 Customizable Pomodoro Timer:** Mode Focus, Short Break, dan Long Break yang dapat disesuaikan durasinya beserta siklus otomatis.
-* **🌧️ Live Synthesized Ambient Sounds:** Suara ambient (Rain, Ocean Waves, Cafe, Deep Brown Noise) dibuat secara langsung menggunakan Web Audio API tanpa perlu mengunduh file audio eksternal.
-* **🎵 YouTube Music Player Integration:** Putar musik atau *preset* playlist (Lofi Radio, Chillhop, Chill Jazz) langsung di dalam aplikasi.
-* **📝 Task & Active Task Tracker:** Tambahkan tugas, atur estimasi Pomodoro, dan hubungkan tugas aktif ke *timer*.
-* **🔥 Daily Stats & Streak Counter:** Pelacak jumlah Pomodoro harian dan *streak* hari berturut-turut.
-* **🧘 Zen / Focus Mode:** Sembunyikan semua elemen antarmuka yang mengganggu fokus hanya dengan satu tombol (atau tekan tombol `F`).
-* **🔒 Privacy-First:** Semua data tugas, pengaturan, dan riwayat tersimpan 100% di peramban lokal (`localStorage`).
-
----
-
-### ⌨️ Shortcut Keyboard
-
-* `Space` : Mulai / Jeda timer
-* `F` : Masuk / Keluar dari Zen Focus Mode
-* `Esc` : Keluar dari Zen Focus Mode / Menutup dialog
+- [Overview](#-overview)
+- [Key Features](#-key-features)
+- [Keyboard Shortcuts](#-keyboard-shortcuts)
+- [How It Works](#-how-it-works)
+- [Tech Stack](#-tech-stack)
+- [Privacy & Security](#-privacy--security)
+- [Getting Started Locally](#-getting-started-locally)
 
 ---
 
-### 🛠️ Teknologi yang Digunakan
+## 📖 Overview
 
-* HTML5 & Tailwind CSS
-* Vanilla JavaScript (ES6+)
-* Web Audio API (untuk efek suara ambient sintetis & chime)
-* Lucide Icons
-* YouTube Iframe API
-* LocalStorage API
+Staying focused in a noisy or distracting environment can be challenging. **FocusSpace** provides an all-in-one distraction-free workspace that pairs structured time-boxing (Pomodoro Technique) with real-time audio soundscapes and task tracking. 
+
+Unlike traditional noise apps, **FocusSpace** synthesizes ambient audio (rain, waves, brown noise) locally in real time using the browser's Web Audio API—eliminating the need to stream or download heavy audio files.
 
 ---
 
-### 🚀 Cara Menjalankan Secara Lokal
+## 📸 Preview
 
-1. *Clone* repositori ini:
-   ```bash
-   git clone [https://github.com/USERNAME/focus-space.git](https://github.com/USERNAME/focus-space.git)
+<img width="1909" height="905" alt="image" src="https://github.com/user-attachments/assets/8064320c-b0ec-466f-9d3d-186258f8d145" />
+
+---
+
+## 🌟 Key Features
+
+- **🎯 Customizable Pomodoro Timer:** Seamless switching between Focus, Short Break, and Long Break modes with auto-cycling options.
+- **🌧️ Real-Time Synthesized Ambient Sounds:** Generates high-quality ambient audio (Rain, Ocean Waves, Cafe ambiance, Deep Brown Noise) on-the-fly using the Web Audio API without fetching external sound files.
+- **🎵 Integrated YouTube Music Player:** Play embedded background music or select pre-curated chill playlists (Lofi Radio, Chillhop, Chill Jazz).
+- **📝 Task & Active Task Tracker:** Add tasks, set estimated Pomodoro intervals, and attach active tasks directly to your timer.
+- **🔥 Daily Stats & Streak Counter:** Track completed Pomodoro sessions and build consistent daily productivity habits.
+- **🧘 Zen / Focus Mode:** Hide all interface clutter with a single click or keyboard shortcut (`F`) for full immersion.
+- **🔒 Privacy-First Architecture:** 100% client-side application. All tasks, settings, and history stay safely on your device in `localStorage`.
+
+---
+
+## ⌨️ Keyboard Shortcuts
+
+| Shortcut | Action |
+| :--- | :--- |
+| <kbd>Space</kbd> | Start / Pause Timer |
+| <kbd>F</kbd> | Toggle Zen / Focus Mode |
+| <kbd>Esc</kbd> | Exit Zen Mode / Close Modals & Dialogs |
+
+---
+
+## 🔄 How It Works
+
+1. **Set Up Your Task:** Add a task to the checklist and assign an estimated number of Pomodoros.
+2. **Choose Your Soundscape:** Mix real-time synthesized ambient sounds or load your favorite YouTube focus playlist.
+3. **Start the Timer:** Press `Space` to initiate your focus session.
+4. **Enter Zen Mode:** Press `F` to clear away UI distractions.
+5. **Take Breaks & Track Progress:** Follow the automated break cycles and build your daily focus streak!
+
+---
+
+## 🛠️ Tech Stack
+
+- **UI & Styling:** HTML5, Tailwind CSS, Lucide Icons
+- **Application Logic:** Vanilla JavaScript (ES6+)
+- **Audio Engine:** Web Audio API (Synthesized background audio & chime notifications)
+- **Integrations:** YouTube IFrame Player API
+- **Storage:** Web Storage API (`localStorage`)
+- **Hosting:** [Netlify](https://www.netlify.com/)
+
+---
+
+## 🔒 Privacy & Security
+
+- **Zero Data Collection:** Your tasks, timers, and productivity stats are never uploaded to any backend server.
+- **No Heavy Downloads:** Ambient audio sounds are generated algorithmically inside your browser, saving bandwidth and keeping performance ultra-lightweight.
+
+---
+
+## 🚀 Getting Started Locally
+
+Follow these steps to run the project locally:
+
+### 1. Clone the Repository
+```bash
+git clone [https://github.com/USERNAME/focus-space.git](https://github.com/USERNAME/focus-space.git)
+cd focus-space
