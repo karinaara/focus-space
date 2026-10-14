@@ -94,5 +94,5 @@ Follow these steps to run the project locally:
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/USERNAME/focus-space.git](https://github.com/USERNAME/focus-space.git)
+git clone [https://github.com/karinaara/focus-space.git](https://github.com/karinaara/focus-space.git)
 cd focus-space
